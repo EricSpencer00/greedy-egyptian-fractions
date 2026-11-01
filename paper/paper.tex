@@ -1,0 +1,228 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\title{A machine-checked proof of the greedy Egyptian fraction theorem}
+\author{Eric Spencer}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The Fibonacci--Sylvester greedy algorithm writes a rational number $a/b \in (0,1)$ as a sum of
+distinct unit fractions by repeatedly subtracting the largest unit fraction that fits. We give a
+complete formalization in Lean~4 and Mathlib of the classical facts about it: the algorithm
+terminates after at most $a$ steps, the unit fractions it produces sum to $a/b$, and their
+denominators strictly increase. As a corollary we obtain a formal proof that every rational in
+$(0,1)$ with numerator $p$ in lowest terms is a sum of at most $p$ distinct unit fractions. We
+also prove, on paper, that consecutive denominators satisfy $n_{i+1} \ge n_i(n_i-1)+1$, and we
+report the smallest fractions $a/b$ that need the full $a$ terms for $a \le 14$.
+\end{abstract}
+
+\section{Introduction}
+
+An \emph{Egyptian fraction} is a sum of distinct unit fractions $1/n$. In the
+\emph{Liber Abaci} (1202), Fibonacci described a method for writing any proper fraction this
+way: take the largest unit fraction not exceeding what is left, subtract it, and repeat.
+Sylvester~\cite{sylvester} gave the first careful proof that the method stops, and the result now
+appears in most introductions to number theory.
+
+The argument is short, but it combines three things that are easy to get subtly wrong: a
+ceiling, a truncated subtraction of natural numbers, and an induction on a quantity that is not
+the length of anything. That makes it a good test case for formalization. Our contribution is a
+complete, \texttt{sorry}-free Lean~4 proof~\cite{repo} on top of Mathlib~\cite{mathlib},
+organized so that each paper lemma corresponds to one Lean theorem.
+
+\section{The algorithm}
+
+\begin{definition}
+For natural numbers $a, b$ define a finite list $G(a,b)$ of natural numbers by $G(0,b) = [\,]$ and,
+for $a > 0$,
+\[
+  G(a,b) = n :: G(an - b,\ nb), \qquad n = \lceil b/a \rceil .
+\]
+\end{definition}
+
+We work with the unreduced pair $(an-b,\,nb)$. Since $\lceil b/a \rceil = \lceil kb/ka \rceil$ for
+every $k \ge 1$, reducing the fraction at each step would produce exactly the same denominators,
+so nothing is lost. The definition is total: it makes sense for all $a, b$, and the recursive call
+always has a smaller first argument (Lemma~\ref{lem:descent}). In Lean the definition is accepted
+by well-founded recursion on $a$, which is the formal statement that the algorithm terminates.
+
+The minimality of $n = \lceil b/a \rceil$ is the inequality
+\begin{equation}\label{eq:ceil}
+  (n-1)\,a < b \le n\,a .
+\end{equation}
+In Lean we avoid both the ceiling and the subtraction in~\eqref{eq:ceil} by writing the numerator
+as $a+1$ and using $n = \lfloor (b+a)/(a+1) \rfloor$, with the equivalent bounds
+$b \le n(a+1) \le b+a$ (\texttt{ceil\_bounds}).
+
+\section{Main results}
+
+\begin{lemma}[numerator descent]\label{lem:descent}
+If $a > 0$ and $n = \lceil b/a \rceil$, then $an - b < a$.
+\end{lemma}
+
+\begin{proof}
+Immediate from the left inequality of~\eqref{eq:ceil}.
+\end{proof}
+
+\begin{theorem}\label{thm:main}
+Let $a, b \in \mathbb{N}$ and $G(a,b) = [n_1, \dots, n_k]$.
+\begin{enumerate}
+  \item $k \le a$. \hfill (\texttt{greedy\_length\_le})
+  \item If $b > 0$ then every $n_i \ge 1$ and $\sum_{i} 1/n_i = a/b$.
+    \hfill (\texttt{greedy\_pos}, \texttt{greedy\_sum})
+  \item Every $n_i$ satisfies $b \le n_i\, a$. \hfill (\texttt{le\_mul\_of\_mem\_greedy})
+  \item If $a < b$ then $n_1 < n_2 < \cdots < n_k$.
+    \hfill (\texttt{greedy\_strictly\_increasing})
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+All four parts are proved by induction along the recursion, that is, by strong induction on $a$.
+Write $a' = an - b$ and $b' = nb$.
+
+(1) Each step adds one term and, by Lemma~\ref{lem:descent}, lowers $a$ by at least one.
+
+(2) If $b > 0$ then $n \ge 1$ by~\eqref{eq:ceil}, so $b' > 0$ and the induction hypothesis
+applies. Since $na \ge b$, the subtraction $a' = na - b$ is exact, and
+$1/n + a'/b' = (b + na - b)/(nb) = a/b$.
+
+(3) For the first term this is~\eqref{eq:ceil}. A later term $m$ lies in $G(a',b')$, so
+$nb \le m a'$ by induction. If $b = 0$ there is nothing to prove; otherwise $n \ge 1$ and
+$b \le nb \le m a' \le m a$.
+
+(4) Let $m$ be a term of $G(a',b')$. Then $a' > 0$, because $G(0,b')$ is empty. Part~(3) gives
+$m a' \ge nb$, and $a' < a < b$ gives $nb > na'$, so $m > n$. The pair $(a',b')$ again satisfies
+$a' < b'$, because $a' < b \le nb$, so induction finishes the proof.
+\end{proof}
+
+\begin{corollary}[Fibonacci]\label{cor:fib}
+Every rational $q \in (0,1)$ is a sum of at most $\operatorname{num}(q)$ distinct unit fractions.
+\hfill (\texttt{exists\_egyptian})
+\end{corollary}
+
+\begin{proof}
+Write $q = p/d$ in lowest terms, so $0 < p < d$, and apply Theorem~\ref{thm:main} to $G(p,d)$.
+\end{proof}
+
+\section{Growth of the denominators}
+
+The greedy algorithm is famous for producing very large denominators. For example, the last
+denominator for $5/121$ has 25 digits, although
+$5/121 = 1/33 + 1/121 + 1/363$. The next proposition explains why.
+
+\begin{proposition}\label{prop:growth}
+If $0 < a < b$ and $G(a,b) = [n_1,\dots,n_k]$, then $n_{i+1} \ge n_i(n_i-1)+1$ for $1 \le i < k$.
+\end{proposition}
+
+\begin{proof}
+Let $r_{i-1}$ be the remainder before $n_i$ is chosen, so $r_0 = a/b$ and
+$n_i = \lceil 1/r_{i-1} \rceil$. By Theorem~\ref{thm:main}(4), $n_i \ge n_1 \ge 2$. By minimality
+of $n_i$, $r_{i-1} < 1/(n_i - 1)$, so
+\[
+  r_i = r_{i-1} - \frac{1}{n_i} < \frac{1}{n_i-1} - \frac{1}{n_i} = \frac{1}{n_i(n_i-1)} .
+\]
+Hence $n_{i+1} = \lceil 1/r_i \rceil > n_i(n_i-1)$.
+\end{proof}
+
+Iterating, $n_{i+1} - \tfrac12 > (n_i - \tfrac12)^2$, so the denominators grow at least
+doubly exponentially, like Sylvester's sequence $2, 3, 7, 43, 1807, \dots$. We checked the
+inequality by computer for every reduced fraction with denominator at most $400$. It is not yet
+formalized.
+
+\section{The bound $k \le a$ is attained}
+
+The bound in Theorem~\ref{thm:main}(1) is sharp: for every $a$ there are fractions $a/b$ in lowest
+terms whose greedy expansion has exactly $a$ terms~\cite{mays}. Reaching $a$ terms requires the
+numerator to drop by exactly one at every step. Since $a' = an - b \equiv -b \pmod a$, the first
+step drops it by one only when $b \equiv 1 \pmod a$, which makes the search below fast.
+Table~\ref{tab:worst} lists the smallest such $b$ for $a \le 14$, together with the size of the
+last denominator.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{rrr@{\qquad}rrr}
+\toprule
+$a$ & least $b$ & digits of $n_a$ & $a$ & least $b$ & digits of $n_a$ \\
+\midrule
+2 & 3 & 1 & 9 & 271 & 396 \\
+3 & 7 & 3 & 10 & 1621 & 1160 \\
+4 & 17 & 7 & 11 & 199 & 1348 \\
+5 & 31 & 16 & 12 & 3961 & 5247 \\
+6 & 109 & 44 & 13 & 1769 & 8905 \\
+7 & 253 & 106 & 14 & 12013 & 24324 \\
+8 & 97 & 150 & & & \\
+\bottomrule
+\end{tabular}
+\caption{Smallest $b$ with $\gcd(a,b)=1$ such that $G(a,b)$ has exactly $a$ terms. Computed by
+\texttt{scripts/stats.py} in~\cite{repo}.}
+\label{tab:worst}
+\end{table}
+
+\section{The formalization}
+
+The development is a single file, \texttt{Egyptian/Basic.lean}, of under 200 lines. It builds
+against Mathlib with no \texttt{sorry}, and the main theorems depend only on Lean's standard
+axioms (\texttt{propext}, \texttt{Quot.sound}, and \texttt{Classical.choice} for the corollary).
+A continuous integration job rebuilds the proof on every change.
+
+Three design choices kept the proofs short.
+\begin{itemize}
+  \item \emph{Pattern-match on $a+1$.} Writing the numerator as $a+1$ removes the side condition
+    $a > 0$ and lets the ceiling be the plain division $\lfloor (b+a)/(a+1) \rfloor$.
+  \item \emph{Natural numbers throughout the algorithm.} The list is computed on $\mathbb{N}$ and
+    only the sum is cast to $\mathbb{Q}$. Truncated subtraction is harmless because
+    \texttt{ceil\_bounds} shows the subtraction is exact; \texttt{omega} then discharges every
+    termination and inequality goal, treating products as atoms.
+  \item \emph{An invariant instead of a direct comparison.} Strict monotonicity is proved through
+    Theorem~\ref{thm:main}(3), $b \le m a$, which survives the recursive call. Comparing
+    neighbouring terms directly needs information about two steps at once and is harder to
+    state as an induction.
+\end{itemize}
+
+The kernel also evaluates the definition: \texttt{greedy 4 13 = [4, 18, 468]} is checked by
+\texttt{decide}.
+
+\section{Further directions}
+
+\begin{itemize}
+  \item Formalize Proposition~\ref{prop:growth} and the doubly exponential lower bound.
+  \item Formalize the sharpness result of Table~\ref{tab:worst}: for every $a$ there is a $b$
+    with exactly $a$ greedy terms.
+  \item The \emph{odd greedy algorithm} uses only odd denominators. Whether it terminates for
+    every $a/b$ with $b$ odd is a well-known open problem~\cite{guy}. Our definitions extend
+    directly, and a formal search for a non-terminating case, or a proof of termination for
+    small numerators, is a natural next step.
+  \item The Erd\H{o}s--Straus conjecture asks whether $4/n$ is always a sum of three unit fractions;
+    the greedy algorithm alone does not settle it, but the same formal framework can check
+    candidate identities.
+\end{itemize}
+
+\begin{thebibliography}{9}
+\bibitem{sylvester} J.~J. Sylvester, On a point in the theory of vulgar fractions,
+  \emph{Amer.\ J.\ Math.}\ \textbf{3} (1880), 332--335.
+\bibitem{mays} M.~Mays, A worst case of the Fibonacci--Sylvester expansion,
+  \emph{J.\ Combin.\ Math.\ Combin.\ Comput.}\ \textbf{1} (1987), 141--148.
+\bibitem{guy} R.~K. Guy, \emph{Unsolved Problems in Number Theory}, 3rd ed., Springer, 2004,
+  Section~D11.
+\bibitem{mathlib} The mathlib Community, The Lean mathematical library,
+  \emph{CPP 2020}, 367--381.
+\bibitem{repo} E.~Spencer, \emph{greedy-egyptian-fractions},
+  \url{https://github.com/EricSpencer00/greedy-egyptian-fractions}, 2026.
+\end{thebibliography}
+
+\end{document}

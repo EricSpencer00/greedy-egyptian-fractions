@@ -62,7 +62,7 @@ n = \lceil 52/3 \rceil = 18,\quad \frac{3}{52} - \frac{1}{18} = \frac{2}{936};\q
 n = \lceil 936/2 \rceil = 468,\quad \text{remainder } 0.
 $$
 
-So $\frac{4}{13} = \frac14 + \frac1{18} + \frac1{468}$, with $3 \le 4$ terms. The algorithm runs on the unreduced pair $(a', b')$; reducing at each step can only shorten the list.
+So $\frac{4}{13} = \frac14 + \frac1{18} + \frac1{468}$, with $3 \le 4$ terms. The algorithm runs on the unreduced pair $(a', b')$. Reducing at each step gives the same denominators, because $\lceil kb/ka \rceil = \lceil b/a \rceil$.
 
 ## Formalization
 
