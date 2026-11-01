@@ -152,6 +152,45 @@ decreasing_by
   rw [Nat.mul_comm]
   omega
 
+/-- **Growth.** If `n` comes before `m` in the expansion then `m > n * (n - 1)`, i.e.
+`m ≥ n ^ 2 - n + 1`. Stated without subtraction as `n * n < m + n`. -/
+theorem greedy_growth : ∀ a b : ℕ, (greedy a b).Pairwise (fun n m => n * n < m + n)
+  | 0, b => by simp
+  | a + 1, b => by
+    rw [greedy_succ]
+    set n := (b + a) / (a + 1) with hn_def
+    have hb := (ceil_bounds a b).1
+    have hup := (ceil_bounds a b).2
+    rw [← hn_def] at hb hup
+    set a' := (a + 1) * n - b with ha'_def
+    have hsum : a' + b = n * (a + 1) := by rw [ha'_def, Nat.mul_comm]; omega
+    have ha' : a' ≤ a := by omega
+    refine List.Pairwise.cons ?_ (greedy_growth a' (n * b))
+    intro m hm
+    have hmul := le_mul_of_mem_greedy a' (n * b) m hm
+    have ha'pos : 0 < a' := by
+      rcases Nat.eq_zero_or_pos a' with h | h
+      · rw [h, greedy_zero] at hm; simp at hm
+      · exact h
+    have hn : 0 < n := by
+      rcases Nat.eq_zero_or_pos n with h | h
+      · rw [h] at hsum; omega
+      · exact h
+    -- If `m + n ≤ n * n` then `n * (b + a') ≤ n * (n * a')`, so `n * (a + 1) ≤ n * a'`,
+    -- contradicting `a' ≤ a`.
+    by_contra hcon
+    push Not at hcon
+    have h1 : (m + n) * a' ≤ n * n * a' := Nat.mul_le_mul_right a' hcon
+    have h2 : n * (b + a') ≤ n * (n * a') := by nlinarith [h1, hmul]
+    have h3 : b + a' ≤ n * a' := Nat.le_of_mul_le_mul_left h2 hn
+    have h4 : n * (a + 1) ≤ n * a' := by omega
+    have h5 : a + 1 ≤ a' := Nat.le_of_mul_le_mul_left h4 hn
+    omega
+termination_by a => a
+decreasing_by
+  rw [Nat.mul_comm]
+  omega
+
 /-- **Fibonacci.** Every rational in `(0, 1)` is a sum of at most `q.num` distinct unit
 fractions. -/
 theorem exists_egyptian (q : ℚ) (h0 : 0 < q) (h1 : q < 1) :
@@ -176,6 +215,44 @@ theorem exists_egyptian (q : ℚ) (h0 : 0 < q) (h1 : q < 1) :
     greedy_pos a q.den hden, ?_, ?_⟩
   · rw [greedy_sum a q.den hden, ← hq]
   · rw [← ha_eq]; exact_mod_cast greedy_length_le a q.den
+
+/-! ## Worst cases: exactly `a` terms -/
+
+/-- The expansion of `a / b` (with `a ≥ 2`) can only use all `a` terms when `b ≡ 1 (mod a)`:
+the first step must lower the numerator by exactly one. -/
+theorem mod_eq_one_of_length_eq (a b : ℕ) (h : (greedy (a + 2) b).length = a + 2) :
+    b % (a + 2) = 1 := by
+  rw [show a + 2 = a + 1 + 1 from rfl, greedy_succ, List.length_cons] at h
+  set n := (b + (a + 1)) / (a + 1 + 1) with hn_def
+  have hb := (ceil_bounds (a + 1) b).1
+  have hup := (ceil_bounds (a + 1) b).2
+  rw [← hn_def] at hb hup
+  have hlen := greedy_length_le ((a + 1 + 1) * n - b) (n * b)
+  have hcomm := Nat.mul_comm (a + 1 + 1) n
+  -- the new numerator is exactly `a + 1`, so `b + (a + 1) = n * (a + 2)`
+  have hsum : b + (a + 1) = n * (a + 1 + 1) := by omega
+  clear_value n
+  obtain ⟨k, rfl⟩ : ∃ k, n = k + 1 := ⟨n - 1, by
+    rcases Nat.eq_zero_or_pos n with h0 | h0
+    · rw [h0] at hsum; omega
+    · omega⟩
+  have hbk : b = 1 + k * (a + 2) := by
+    rw [Nat.add_mul, one_mul] at hsum
+    have : k * (a + 1 + 1) = k * (a + 2) := rfl
+    omega
+  rw [hbk, Nat.add_mul_mod_self_right, Nat.mod_eq_of_lt (by omega)]
+
+/-- `b` is the least denominator coprime to `a` whose expansion of `a / b` has exactly `a` terms. -/
+def IsSmallestWorstCase (a b : ℕ) : Bool :=
+  (greedy a b).length == a && Nat.gcd a b == 1 &&
+    (List.range b).all fun c => !(a < c && Nat.gcd a c == 1 && (greedy a c).length == a)
+
+/-- Table 1 of the paper, checked by the kernel. -/
+theorem smallest_worst_cases :
+    [(2, 3), (3, 7), (4, 17), (5, 31), (6, 109), (7, 253), (8, 97), (9, 271), (10, 1621),
+      (11, 199), (12, 3961), (13, 1769), (14, 12013)].all
+      (fun p => IsSmallestWorstCase p.1 p.2) = true := by
+  decide +kernel
 
 /-! The worked example from the write-up: `4 / 13 = 1/4 + 1/18 + 1/468`. -/
 example : greedy 4 13 = [4, 18, 468] := by decide +kernel

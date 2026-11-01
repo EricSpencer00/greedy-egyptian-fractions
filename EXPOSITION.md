@@ -87,6 +87,7 @@ argument in the proof assistant **Lean 4**, which checks every step down to the 
 | The pieces add up to $\frac ab$ | `greedy_sum` |
 | The pieces are all different | `greedy_strictly_increasing` |
 | Every fraction between 0 and 1 is Egyptian | `exists_egyptian` |
+| Each denominator is at least $n(n-1)+1$ after $n$ | `greedy_growth` |
 
 The code is in [Egyptian/Basic.lean](Egyptian/Basic.lean). The full proof is in
 [SOLUTION.md](SOLUTION.md), and the paper is [paper/paper.pdf](paper/paper.pdf).

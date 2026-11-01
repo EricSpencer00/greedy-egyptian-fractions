@@ -27,8 +27,9 @@ complete formalization in Lean~4 and Mathlib of the classical facts about it: th
 terminates after at most $a$ steps, the unit fractions it produces sum to $a/b$, and their
 denominators strictly increase. As a corollary we obtain a formal proof that every rational in
 $(0,1)$ with numerator $p$ in lowest terms is a sum of at most $p$ distinct unit fractions. We
-also prove, on paper, that consecutive denominators satisfy $n_{i+1} \ge n_i(n_i-1)+1$, and we
-report the smallest fractions $a/b$ that need the full $a$ terms for $a \le 14$.
+also formalize the growth bound $n_{i+1} \ge n_i(n_i-1)+1$ and the fact that $a/b$ can need all
+$a$ terms only when $b \equiv 1 \pmod a$, and we give the smallest fractions that need all $a$
+terms for $a \le 14$, each certified by the Lean kernel.
 \end{abstract}
 
 \section{Introduction}
@@ -127,6 +128,7 @@ $5/121 = 1/33 + 1/121 + 1/363$. The next proposition explains why.
 
 \begin{proposition}\label{prop:growth}
 If $0 < a < b$ and $G(a,b) = [n_1,\dots,n_k]$, then $n_{i+1} \ge n_i(n_i-1)+1$ for $1 \le i < k$.
+\hfill (\texttt{greedy\_growth})
 \end{proposition}
 
 \begin{proof}
@@ -140,18 +142,35 @@ Hence $n_{i+1} = \lceil 1/r_i \rceil > n_i(n_i-1)$.
 \end{proof}
 
 Iterating, $n_{i+1} - \tfrac12 > (n_i - \tfrac12)^2$, so the denominators grow at least
-doubly exponentially, like Sylvester's sequence $2, 3, 7, 43, 1807, \dots$. We checked the
-inequality by computer for every reduced fraction with denominator at most $400$. It is not yet
-formalized.
+doubly exponentially, like Sylvester's sequence $2, 3, 7, 43, 1807, \dots$.
 
-\section{The bound $k \le a$ is attained}
+\begin{remark}
+The Lean theorem \texttt{greedy\_growth} is slightly stronger: it holds for all $a, b$, and for
+every pair $n$ before $m$ in the list, not only neighbours. Its proof avoids rationals. A later
+term $m$ lies in $G(a',b')$, so $m a' \ge nb$ by Theorem~\ref{thm:main}(3). If $m \le n(n-1)$
+this gives $b + a' \le n a'$, i.e.\ $n a \le n a'$, contradicting $a' < a$.
+\end{remark}
 
-The bound in Theorem~\ref{thm:main}(1) is sharp: for every $a$ there are fractions $a/b$ in lowest
-terms whose greedy expansion has exactly $a$ terms~\cite{mays}. Reaching $a$ terms requires the
-numerator to drop by exactly one at every step. Since $a' = an - b \equiv -b \pmod a$, the first
-step drops it by one only when $b \equiv 1 \pmod a$, which makes the search below fast.
-Table~\ref{tab:worst} lists the smallest such $b$ for $a \le 14$, together with the size of the
-last denominator.
+\section{When the bound $k \le a$ is attained}
+
+Mays~\cite{mays} studies when the greedy expansion of $a/b$ has exactly $a$ terms. One
+necessary condition is easy and is formalized.
+
+\begin{proposition}\label{prop:mod}
+If $a \ge 2$ and $G(a,b)$ has exactly $a$ terms, then $b \equiv 1 \pmod a$.
+\\ \hspace*{\fill}(\texttt{mod\_eq\_one\_of\_length\_eq})
+\end{proposition}
+
+\begin{proof}
+After the first step at most $a'$ terms remain, by Theorem~\ref{thm:main}(1). So $a' \ge a - 1$,
+and with Lemma~\ref{lem:descent}, $a' = an - b = a - 1$. Hence $b = a(n-1) + 1$.
+\end{proof}
+
+Proposition~\ref{prop:mod} cuts the search for worst cases by a factor of $a$.
+Table~\ref{tab:worst} lists, for $a \le 14$, the smallest $b$ with $\gcd(a,b)=1$ such that
+$G(a,b)$ has exactly $a$ terms. The whole table, including minimality, is the Lean theorem
+\texttt{smallest\_worst\_cases}, checked by the kernel with \texttt{decide}. We do not know a
+proof that such a $b$ exists for every $a$.
 
 \begin{table}[h]
 \centering
@@ -168,16 +187,18 @@ $a$ & least $b$ & digits of $n_a$ & $a$ & least $b$ & digits of $n_a$ \\
 8 & 97 & 150 & & & \\
 \bottomrule
 \end{tabular}
-\caption{Smallest $b$ with $\gcd(a,b)=1$ such that $G(a,b)$ has exactly $a$ terms. Computed by
-\texttt{scripts/stats.py} in~\cite{repo}.}
+\caption{Smallest $b$ with $\gcd(a,b)=1$ such that $G(a,b)$ has exactly $a$ terms, and the
+number of digits of the last denominator. Certified by \texttt{smallest\_worst\_cases};
+the digit counts are from \texttt{scripts/stats.py}~\cite{repo}.}
 \label{tab:worst}
 \end{table}
 
 \section{The formalization}
 
-The development is a single file, \texttt{Egyptian/Basic.lean}, of under 200 lines. It builds
-against Mathlib with no \texttt{sorry}, and the main theorems depend only on Lean's standard
-axioms (\texttt{propext}, \texttt{Quot.sound}, and \texttt{Classical.choice} for the corollary).
+The development is a single file, \texttt{Egyptian/Basic.lean}, of about 260 lines, and builds
+in under half a minute. It uses Mathlib, contains no \texttt{sorry}, and every theorem depends
+only on Lean's standard axioms (\texttt{propext}, \texttt{Quot.sound}, and
+\texttt{Classical.choice} for the results that go through Mathlib's arithmetic tactics).
 A continuous integration job rebuilds the proof on every change.
 
 Three design choices kept the proofs short.
@@ -200,9 +221,10 @@ The kernel also evaluates the definition: \texttt{greedy 4 13 = [4, 18, 468]} is
 \section{Further directions}
 
 \begin{itemize}
-  \item Formalize Proposition~\ref{prop:growth} and the doubly exponential lower bound.
-  \item Formalize the sharpness result of Table~\ref{tab:worst}: for every $a$ there is a $b$
-    with exactly $a$ greedy terms.
+  \item Show that every $a$ has some $b$ with exactly $a$ greedy terms, or find an $a$ with none.
+    Table~\ref{tab:worst} settles $a \le 14$.
+  \item Formalize the closed form of the doubly exponential lower bound that follows from
+    Proposition~\ref{prop:growth}.
   \item The \emph{odd greedy algorithm} uses only odd denominators. Whether it terminates for
     every $a/b$ with $b$ odd is a well-known open problem~\cite{guy}. Our definitions extend
     directly, and a formal search for a non-terminating case, or a proof of termination for
@@ -214,7 +236,7 @@ The kernel also evaluates the definition: \texttt{greedy 4 13 = [4, 18, 468]} is
 
 \begin{thebibliography}{9}
 \bibitem{sylvester} J.~J. Sylvester, On a point in the theory of vulgar fractions,
-  \emph{Amer.\ J.\ Math.}\ \textbf{3} (1880), 332--335.
+  \emph{Amer.\ J.\ Math.}\ \textbf{3} (1880), 332--335, 388--389.
 \bibitem{mays} M.~Mays, A worst case of the Fibonacci--Sylvester expansion,
   \emph{J.\ Combin.\ Math.\ Combin.\ Comput.}\ \textbf{1} (1987), 141--148.
 \bibitem{guy} R.~K. Guy, \emph{Unsolved Problems in Number Theory}, 3rd ed., Springer, 2004,

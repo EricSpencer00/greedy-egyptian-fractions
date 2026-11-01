@@ -66,7 +66,7 @@ So $\frac{4}{13} = \frac14 + \frac1{18} + \frac1{468}$, with $3 \le 4$ terms. Th
 
 ## Formalization
 
-All three parts of the theorem and the corollary are proved in Lean 4 with Mathlib, with no `sorry`. See [`Egyptian/Basic.lean`](Egyptian/Basic.lean).
+All three parts of the theorem, the corollary and the extra results below are proved in Lean 4 with Mathlib, with no `sorry`. See [`Egyptian/Basic.lean`](Egyptian/Basic.lean).
 
 | Statement | Lean name |
 | --- | --- |
@@ -77,3 +77,6 @@ All three parts of the theorem and the corollary are proved in Lean 4 with Mathl
 | Inequality (2) | `le_mul_of_mem_greedy` |
 | Strictly increasing | `greedy_strictly_increasing` |
 | Corollary | `exists_egyptian` |
+| Growth: a later term $m$ after $n$ has $m \ge n(n-1)+1$ | `greedy_growth` |
+| Exactly $a$ terms forces $b \equiv 1 \pmod a$ | `mod_eq_one_of_length_eq` |
+| Smallest worst cases for $a \le 14$ (paper, Table 1) | `smallest_worst_cases` |
